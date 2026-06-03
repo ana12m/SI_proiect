@@ -1,181 +1,132 @@
-# Sistem de Control Ambiental Inteligent 
+# Embedded Systems Course and Labs for students from Automation and Applied Informatics from Faculty of Automation, Computers and Electronics, University of Craiova
 
-> Proiect integrat pentru cursul de Sisteme Incorporate, Automatică și Informatică Aplicată,  
-> Facultatea de Automatică, Calculatoare și Electronică, Universitatea din Craiova.
+This repository is dedicated to the Embedded Systems course and labs for students from Automation and Applied Informatics from Faculty of Automation, Computers and Electronics, University of Craiova. 
 
+If you are a student: please fork this repository and use it for your labs, homework and course. 
 
+Found a bug or you just want to contribute to this project ? Please raise an issue and/or send a pull request.
 
-## Descrierea Proiectului
-
-Acest proiect implementează un **Sistem de Control Ambiental Inteligent (Smart Home Node)** pe microcontrollerul (Arduino Nano/Uno). Sistemul monitorizează mediul în timp real prin doi senzori analogici și reacționează automat prin două canale PWM, fără a bloca procesorul. Un buton de urgență declanșează hardware o stare de alertă prin întrerupere externă.
-
-Proiectul integrează toate conceptele din laboratoare într-o logică de control unitară:
-
-| Laborator | Modul | Rol în sistem |
-|-----------|-------|---------------|
-| Lab 1 | GPIO | LED status sistem, configurare button cu pull-up |
-| Lab 2 | Întreruperi Externe (INT0) | Buton urgență — declanșare alertă hardware |
-| Lab 3 | Timer0 / `Millis()` | Bază de timp neblocantă — citire senzori la 200 ms |
-| Lab 4 | PWM (Timer1, Timer2) | Control lumină ambientală și ventilator prin duty cycle |
-| Lab 5 | ADC | Citire senzor lumină (A0) și senzor temperatură (A1) |
+[![Run Tests](https://github.com/mamuleanu/embedded-systems-course-atmega328p/actions/workflows/tests.yml/badge.svg)](https://github.com/mamuleanu/embedded-systems-course-atmega328p/actions/workflows/tests.yml)
 
 
+## Features
 
-## Schema de Conectare
+- **No Arduino Libraries**: Direct register manipulation for maximum control and efficiency.
+- **Drivers:**: Modular, documented, and reusable.
+    - **GPIO**: Initialization, Write, Read, Toggle.
+    - **Interrupts**: External Interrupts (INT0, INT1) with callback support.
+    - **Timer**: 1ms System Tick (`Millis()`) using Timer0 CTC mode.
+    - **EEPROM**: Read, Write, Update (lifespan-aware).
+    - **ADC**: Blocking 10-bit Analog-to-Digital conversion.
+    - **PWM**: High-level wrapper for Timer1 (16-bit) and Timer2 (8-bit) PWM generation.
+- **Board Support Package (BSP)**: Pin mappings for **Arduino Nano** and **Uno**.
+- **Robust Build System**: `Makefile` for compilation, flashing, and testing.
+- **Host-Based Unit Testing**: Run unit tests on your computer without hardware using register mocking.
+- **Code Coverage**: Generate HTML reports (`lcov`) to verify test coverage.
 
+## Roadmap
 
-Arduino Nano/Uno
-│
-├── D13 (LED_BUILTIN) ── LED Status sistem
-│                         Blink lent  (500ms) = Sistem OK
-│                         Blink rapid (100ms) = ALERTĂ
-│
-├── D11 (PWM, Timer2) ── LED / Bec dimabil
-│                         Intensitate invers proporțională cu lumina din cameră
-│
-├── D9  (PWM, Timer1) ── LED / Motor ventilator
-│                         Viteză proporțională cu temperatura citită
-│
-├── D2  (INT0)        ── Buton urgență (cu pull-up intern)
-│                         Apăsare → front descrescător → ISR → STATE_ALERTA
-│
-├── A0  (ADC Ch.0)    ── LDR / Potențiometru (simulare lumină ambientală)
-│
-└── A1  (ADC Ch.1)    ── Senzor NTC / Potențiometru (simulare temperatură)
+- [x] GPIO driver
+- [x] ADC driver
+- [x] EEPROM driver
+- [x] Interrupt driver
+- [x] Timer driver
+- [x] PWM driver
+- [ ] I2C driver
+- [ ] SPI driver
+- [ ] UART driver
+- [ ] Unit tests
 
+## Project Structure
 
-
-## Logica Sistemului — Mașina de Stări
-
-
-                    ┌─────────────────────┐
-          Reset     │                     │
-        ──────────► │    STATE_NORMAL     │
-                    │                     │
-                    │  • Citire LDR (A0)  │
-                    │  • Citire Temp (A1) │   Apăsare buton D2
-                    │  • PWM Lumina auto  │ ─────────────────────►
-                    │  • PWM Ventil. auto │
-                    │  • LED blink lent   │
-                    └─────────────────────┘
-
-                    ┌─────────────────────┐
-                    │                     │
-                    │    STATE_ALERTA     │
-                    │                     │
-                    │  • PWM Lumina = 0   │
-                    │  • PWM Ventil. = 0  │
-                    │  • LED blink rapid  │
-                    │                     │
-                    └─────────────────────┘
-                    (Ieșire: reset hardware)
-
-
-### Logica de control PWM
-
-**Lumina ambientală (D11):**
-
-lightDuty = 255 - (ADC_Read(A0) / 4)
-
-ADC = 0    ( lumină maximă) → duty = 255 → LED la maxim
-ADC = 512  (lumină medie)   → duty = 127 → LED la 50%
-ADC = 1023 (întuneric total)  → duty = 0   → LED stins
-
-
-## Structura Proiectului
-
-
-├── bsp/                    # Definire pini pentru plăci (uno.h, nano.h)
-├── drivers/                # Strat de abstractizare hardware (HAL)
-│   ├── adc/                # Driver ADC — conversie 10-bit blocantă
-│   ├── eeprom/             # Driver EEPROM — Read/Write/Update
-│   ├── gpio/               # Driver GPIO — Init/Write/Read/Toggle
-│   ├── interrupt/          # Driver întreruperi externe INT0/INT1
-│   ├── pwm/                # Driver PWM — wrapper Timer1 și Timer2
-│   └── timer/              # Driver Timer0 — Millis() la 1ms
-├── src/
-│   └── main.c              # Logica principală — mașina de stări
-├── test/                   # Teste unitare pe host (fără hardware)
-│   ├── framework/          # Runner minimal pentru teste
-│   ├── mocks/              # Mock registre AVR pentru simulare
-│   └── test_*.c            # Fișiere de test (GPIO, PWM)
-├── utils/                  # Macro-uri utilitare (Delay, BIT ops)
-└── Makefile                # Compilare, flash, teste, coverage
-
+```
+├── bsp/            # Board definitions (uno.h, nano.h)
+├── drivers/        # Hardware Abstraction Layer
+│   ├── adc/
+│   ├── eeprom/
+│   ├── gpio/
+│   ├── interrupt/
+│   └── timer/
+├── src/            # Application source code (main.c)
+├── test/           # Unit tests & Mocks
+│   ├── mocks/      # Mock AVR registers for host testing
+│   ├── framework/  # Minimal test runner
+│   └── test_*.c    # Unit test files
+├── utils/          # Helper macros (BIT manipulations)
+└── Makefile        # Build configuration
+```
 
 ## Build & Flash
 
-### Cerințe
-
+### Prerequisites
 - `avr-gcc` toolchain
 - `avrdude`
 - `make`
-- `gcc` + `lcov` (opțional, pentru teste și coverage)
 
-### Comenzi principale
+### Commands
+| Command | Description |
+|---------|-------------|
+| `make all BOARD=nano` | Compile the project for Arduino Nano. |
+| `make flash` | Flash the firmware to the connected board. |
+| `make clean` | Remove build artifacts. |
 
-| Comandă | Descriere |
-|---------|-----------|
-| `make all BOARD=nano` | Compilare pentru Arduino Nano |
-| `make all BOARD=uno` | Compilare pentru Arduino Uno |
-| `make flash` | Încărcare firmware pe placă (port COM3, 57600 baud) |
-| `make clean` | Ștergere artefacte de build |
+## Testing & Coverage
 
-> **Port serial:** Modifică variabila `PORT` în `Makefile` dacă placa nu este pe `COM3`  
-> (ex: `PORT = /dev/ttyUSB0` pe Linux, `PORT = /dev/cu.usbserial-*` pe macOS).
+This project supports running unit tests on your host machine (Mac/Linux) by mocking the AVR hardware registers.
 
+### Prerequisites (for coverage)
+- `gcc`
+- `lcov` (`brew install lcov`)
 
-## Teste și Code Coverage
+### Commands
+| Command | Description |
+|---------|-------------|
+| `make test` | Compile and run all unit tests (GPIO, PWM) on the host. |
+| `make coverage` | Run tests and generate usage metrics. |
+| `make coverage-html` | Generate a visual HTML report of code coverage. |
 
-Proiectul suportă rularea testelor unitare direct pe calculatorul tău (fără hardware) prin simularea registrelor AVR.
+![Code Coverage Example](/img/code_coverage_example.png)
 
-### Comenzi
-
-| Comandă | Descriere |
-|---------|-----------|
-| `make test` | Compilare și rulare toate testele (GPIO, PWM) |
-| `make coverage` | Rulare teste + generare raport gcov |
-| `make coverage-html` | Generare raport HTML vizual (necesită `lcov`) |
-
-
-
-## Drivere disponibile
-
-| Driver | Funcții principale | Status |
-|--------|-------------------|--------|
-| GPIO | `GPIO_Init`, `GPIO_Write`, `GPIO_Read`, `GPIO_Toggle` | ✅ |
-| Interrupt | `ExtInt_Init` cu callback | ✅ |
-| Timer0 | `Timer0_Init`, `Millis()` (CTC 1ms) | ✅ |
-| ADC | `ADC_Init`, `ADC_Read` (10-bit blocant) | ✅ |
-| PWM | `PWM_Init`, `PWM_SetDutyCycle` (Timer1 + Timer2) | ✅ |
-| EEPROM | `EEPROM_Read`, `EEPROM_Write`, `EEPROM_Update` | ✅ |
-| I2C | — | 🔲 Planificat |
-| SPI | — | 🔲 Planificat |
-| UART | — | 🔲 Planificat |
-
----
-
-## Exemplu de utilizare a driverelor
+## Usage Example
 
 ```c
 #include "drivers/gpio/gpio.h"
 #include "drivers/timer/timer0.h"
-#include "drivers/adc/adc.h"
-#include "drivers/pwm/pwm.h"
 #include "bsp/nano.h"
 
 int main(void) {
+    
     Timer0_Init();
-    ADC_Init();
     GPIO_Init(LED_BUILTIN, GPIO_OUTPUT);
-    PWM_Init(D11, 1000);   /* 1 kHz pe D11 */
 
-    sei();
+    uint32_t last_time = 0;
 
     while (1) {
-        uint16_t val = ADC_Read(0);            /* Citire A0             */
-        PWM_SetDutyCycle(D11, 255 - (val>>2)); /* Inversare + scalare   */
-        GPIO_Toggle(LED_BUILTIN);
-        /* Delay neblocant: foloseste Millis() in productie */
+            
+        if (Millis() - last_time >= 1000) {
+            last_time = Millis();
+            GPIO_Toggle(LED_BUILTIN);
+        }
     }
 }
+
+// PWM Usage Example
+#include "drivers/pwm/pwm.h"
+#include "bsp/uno.h"
+
+int pwm_example(void) {
+    // 50Hz for Servo on D9
+    PWM_Init(UNO_D9, 50);
+    // 1.5ms pulse (approx neutral)
+    // Duty cycle calculation: (1.5ms / 20ms) * ICR1_TOP
+    // Wrapper takes 0-255: (1.5/20)*255 = ~19
+    PWM_SetDutyCycle(UNO_D9, 19);
+
+    // 1kHz LED Dimming on D11
+    PWM_Init(UNO_D11, 1000);
+    PWM_SetDutyCycle(UNO_D11, 128); // 50%
+    
+    return 0;
+}
+```
+
